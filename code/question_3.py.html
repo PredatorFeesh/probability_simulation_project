@@ -1,0 +1,177 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# # Question 3
+
+# ![](images/question_3.png)
+
+# ![](images/question_3_diag.png)
+
+# ![](images/question_3_a.png)
+
+# ## ASSUMPTIONS:
+# ### - IF A TREE BURNED, WE CAN MOVE ON IT AGAIN (EXTINGUISHED). 
+# THE CONVERSE GREATLY REDUCES THE RUNTIME OF THE PROGRAM, BUT DOES MAKE A SIGNIFICANT CHANGE IN ANSWER.
+# ##### *The alternative for this is also exists here and is tracked
+# ### - *IF A BURNED TREE CAN BURN AGAIN:* IF MORE THEN HALF OF THE FISRT IS BURNING, MOST OF THE FOREST IS BURNING
+# Reasoning: Let's first look at the half smallest. The probability is bernoulli, and the sum of all active fires is going to be a binomial. We can expect then np trees to burn. Probability of (South and North) Eeast is going to be 0.3, so we can expect 0.3n trees to be burned. If half the grid is burning, we will assume around 20/2 = 10 trees burning, thus we can expect about 3 more trees to the East. Similar logic applies toward North and South, and West has an increased chance, so the fire has a higher chance to stay alive. 
+# ### - IF THE FIRE GOES OFF THE GRID,  IT IS EXTINGUISHED 
+# ### - THERE ARE MULTIPLE FIRES (SINCE PROBABILITY OF A FIRE DOESN'T UP OR DOWN OR LEFT OR RIGHT GREATER THEN 1). THEY SPREAD IF THEIR CHANCE IS UP.
+
+# We want our true value, with 95% probability, to be within 0.005 of the true answer. <br>
+# $P\{|\hat{p} - p| > \epsilon \} \leq \alpha$, where $\epsilon=0.005$, and $\alpha = 0.05$ (since we want 95% accuracy), so: <br>
+# $P\{|\hat{p} - p| > 0.005\} \leq 0.05$. We do now have an intelligent guess here, so we will calculate: $N = 0.25 (\frac{z_{0.05}}{0.005})^2$ = $0.25 (\frac{1.6449}{0.005})^2 \approx 27057$ iterations. 
+
+# Entire question will be posted so that decesions could be explained.
+# ![](images/question_3_parts.png)
+
+# In[9]:
+
+
+import random
+import numpy as np
+import math
+
+
+# In[10]:
+
+
+trials : int = 1000
+
+# We will track the x and y of the fire. We can keep track of trees being spread to
+# by setting a max bound
+max_row : int = 20
+max_col : int = 50
+
+# The house coordinates are:
+house_row : int = 0
+house_col : int = 49
+
+# Since question (a) asks for a propostion, we should also calculate total cells
+total_cells = max_row * max_col
+
+# We will also track of ACTIVE fire locations (row,col)
+active_fires : list = []
+
+# Track porbability of moving a direction
+prob_left : float = 0.8
+prob_right : float = 0.3
+prob_up : float = 0.3
+prob_down : float = 0.3
+
+# We will keep track of indicies of trees already burned. 
+already_burned : list = []
+all_possible : list = [(x,y) for y in range(max_row) for x in range(max_col)]
+check_burned : bool = False # not_iter_burned # Simulation rule whether we can or can not iterate on burned trees
+
+
+# In[13]:
+
+
+# Let's write a function for making moving easier
+# Note: If we don't care what trees already burned, the already_burned stores the total trees that were burned
+# anyways, although we don't use this for comparison.
+def possible( pos : tuple, check_burned : bool ) -> bool: # Check if move is possible (we can't go off border)
+    global already_burned
+    if check_burned:
+        # @return if we are in the bounds, and not already burned, and if we are not already to be burning
+        return pos[0] < max_row and pos[0] >= 0 and pos[1] < max_col and pos[1] >= 0 and pos not in already_burned and pos not in active_fires
+    # @return if we are in the bounds, and not already to be burning
+    return pos[0] < max_row and pos[0] >= 0 and pos[1] < max_col and pos[1] >= 0 and pos not in active_fires and pos not in active_fires
+
+def move( pos : tuple, direction : str, check_burned : bool ) -> None:
+    global active_fires
+    
+    if direction == "place" and possible( pos, check_burned=check_burned ): # We don't move but place
+        active_fires.append( pos ) # We place the new fire
+        if pos not in already_burned: # Only append if we aren't already burned
+            already_burned.append(pos)  # Now we say it burned
+    if direction == "u" and possible((pos[0]-1, pos[1]), check_burned=check_burned): # up
+        move( (pos[0] - 1, pos[1]), "place", check_burned ) # places
+    if direction == "d" and possible((pos[0]+1, pos[1]), check_burned=check_burned): # down
+        move( (pos[0] + 1, pos[1]), "place", check_burned )# places
+    if direction == "l" and possible((pos[0], pos[1]-1), check_burned=check_burned): # left
+        move( (pos[0] , pos[1] - 1), "place", check_burned ) # places
+    if direction == "r" and possible((pos[0], pos[1]+1), check_burned=check_burned): # right
+        move( (pos[0], pos[1] + 1), "place", check_burned ) # places
+        # NOTE: We check burned every time, in order to avoid recursion if possible (as it is very inneficient)
+def process_move( check_burned : bool ) -> None:
+    global active_fires
+    global prob_down
+    global prob_up
+    global prob_right
+    global prob_left
+    global all_possible
+    global already_burned
+    if not check_burned and len(active_fires) >= total_cells/3: # If we reitering already burned trees
+        active_fires = []
+        already_burned = all_possible    
+        return
+    # Save copy of activactive_fires because we are resetting activeactive_fires as this iterates
+    active_fires_copy = active_fires # Here save
+    active_fires = [] # Here we reset
+    # Check if we are moving in up, down, left, or right for each active fire
+    
+    for fire in active_fires_copy:
+        if random.random() < prob_left:
+            move(fire, "l", check_burned=check_burned)
+        if random.random() < prob_up:
+            move(fire, "u", check_burned=check_burned)
+        if random.random() < prob_down:
+            move(fire, "d", check_burned=check_burned)
+        if random.random() < prob_right:
+            move(fire, "r", check_burned=check_burned)
+        
+    # Now we should have our updated fires           
+
+
+# In[6]:
+
+
+# We need a reset as well for the trials
+def reset() -> None:
+    global active_fires
+    global already_burned
+    already_burned = []
+    active_fires = []
+    move( (0,0), "place", check_burned=check_burned )
+
+
+# In[14]:
+
+
+# Let's track some variables 
+total_trees_bruned = []
+
+
+# Now let's run this simulation
+for trial in range(trials):
+    reset()
+    while len(active_fires) != 0: # While there are still fires to process
+        process_move( check_burned = check_burned )
+        
+    total_trees_bruned.append( len(already_burned) )
+total_trees_bruned = np.array(total_trees_bruned)
+# Part (a)
+print("\t(a) Probability more then 30 trees burn:{}".format(                                                        (total_trees_bruned >= 30).mean()                                                          ))
+print("\t(b) Expected number of burned trees:{}".format(                                                    total_trees_bruned.mean()                                                   ))
+print("\t(c) Standard Deviation of trees burned: {}".format(                                                        total_trees_bruned.std()                                                       ))
+
+
+# We get a huge variance, thus telling to us that this simulation is not really accurate. <br>
+# 
+# Next, we look for the probability that the estimator is off by 25 trees. This is P(137 < X < 187). In order to solve this, we will need to assume a certain distribution. Because we tend to be at extremes, this looks most like the [U distribution](https://en.wikipedia.org/wiki/U-quadratic_distribution).
+# 
+# 
+
+# $f(x) = \alpha (x-\beta)^2  , \alpha = \frac{12}{(b-a)^3} , \beta = \frac{a+b}{2}$ <br>
+# In our case, $a,b$ are equal to the two maximum extremes, $1, 1000$. <br>
+# So: $\alpha = \frac{12}{(b-a)^3} = \frac{12}{999^3} = 1.2 * 10^{-8} , \beta = \frac{a+b}{2} = \frac{1001}{2} = 500.5$<br>
+# 
+# $F(x) = \frac{\alpha}{3} ((x-\beta)^3 - (\beta - \alpha)^3)  $ <br>
+# $1 - P(137 < X < 187) = 1 - (F(187) - F(137)) \approx 1 - 0.6 = 0.94 $ <br>
+# # HOWEVER, we will assume normal in order to get a more approximate answer as the question implies that it expects this to be normal. Going through this calculation again:
+# $1 -P(137 < X < 187) = 1 - P(\frac{137-161}{364} < X < \frac{187-161}{364}) = 1 - P( -0.06593 < Z < 0.07143 ) = 1 - \phi(0.07143) + \phi(-0.06593) \approx 0.98$ <br>
+# So part (d), answer 0.98.
+
+# (e) Yes, the house is in real danger. The house and the origin of the fire are only 50 trees apart. Although it may seem that the probability thus is $7.18 * 10^{-27}$, in reality, there are $1 000$ possible cells for the fire to spread to the house. This makes the probability of the house burning significantly higher. 
